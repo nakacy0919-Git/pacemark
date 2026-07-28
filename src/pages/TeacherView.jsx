@@ -1,11 +1,11 @@
 import { useState, useEffect } from 'react';
 import { useSearchParams, Link } from 'react-router-dom';
 import { QRCodeSVG } from 'qrcode.react';
-import { Copy, Check, Maximize2, X } from 'lucide-react';
+import { Copy, Check, Maximize2, X, Play } from 'lucide-react';
 import { db } from '../lib/firebase';
-import { ref, onValue } from 'firebase/database';
+import { ref, onValue, update } from 'firebase/database';
 import ProgressGrid from '../components/ProgressGrid';
-import CountdownTimer from '../components/CountdownTimer'; // ★タイマーを読み込み
+import CountdownTimer from '../components/CountdownTimer';
 
 export default function TeacherView() {
   const [searchParams] = useSearchParams();
@@ -16,7 +16,6 @@ export default function TeacherView() {
   const [isCopied, setIsCopied] = useState(false);
   const [settings, setSettings] = useState(null);
 
-  // タイマーに必要な設定データをFirebaseから取得
   useEffect(() => {
     if (!sessionId) return;
     const sessionRef = ref(db, `sessions/${sessionId}/settings`);
@@ -32,6 +31,14 @@ export default function TeacherView() {
     navigator.clipboard.writeText(studentUrl);
     setIsCopied(true);
     setTimeout(() => setIsCopied(false), 2000);
+  };
+
+  // ★ タイマーを手動でスタートする処理
+  const handleStartTimer = async () => {
+    if (!sessionId) return;
+    await update(ref(db, `sessions/${sessionId}/settings`), {
+      startTime: Date.now()
+    });
   };
 
   if (!sessionId) {
@@ -73,11 +80,20 @@ export default function TeacherView() {
                 <p className="text-slate-500 mt-2 font-medium">セッションID: <span className="text-blue-500 font-bold">{sessionId}</span></p>
               </div>
               
-              {/* ★ここにタイマーを表示 */}
               <div className="flex items-center gap-6">
-                {settings && settings.startTime && (
+                {/* ★ startTimeがあるかどうかで、タイマーかスタートボタンかを切り替え */}
+                {settings && settings.startTime ? (
                   <CountdownTimer startTime={settings.startTime} timerMinutes={settings.timerMinutes} />
+                ) : (
+                  <button 
+                    onClick={handleStartTimer}
+                    className="flex items-center gap-2 px-5 py-2.5 bg-slate-800 text-white font-bold rounded-2xl shadow-sm hover:bg-slate-700 active:scale-95 transition-all"
+                  >
+                    <Play size={20} className="fill-white" />
+                    タイマーを開始
+                  </button>
                 )}
+                
                 <Link to="/" className="px-5 py-2 bg-slate-100 text-slate-600 font-bold rounded-xl hover:bg-slate-200 transition-all">
                   終了して戻る
                 </Link>
@@ -85,11 +101,7 @@ export default function TeacherView() {
             </div>
             
             <div className="flex flex-col md:flex-row gap-8 items-center justify-center bg-blue-50/50 p-6 md:p-8 rounded-2xl border border-blue-100">
-              <div 
-                className="relative group cursor-pointer"
-                onClick={() => setIsQRModalOpen(true)}
-                title="クリックして拡大"
-              >
+              <div className="relative group cursor-pointer" onClick={() => setIsQRModalOpen(true)} title="クリックして拡大">
                 <div className="bg-white p-3 rounded-2xl shadow-sm border border-slate-100 group-hover:border-blue-300 transition-colors">
                   <QRCodeSVG value={studentUrl} size={140} level="H" />
                 </div>
@@ -99,7 +111,6 @@ export default function TeacherView() {
                   </div>
                 </div>
               </div>
-
               <div className="text-center md:text-left w-full md:w-auto">
                 <h2 className="text-xl font-bold text-slate-700 mb-2">生徒の参加方法</h2>
                 <p className="text-slate-600 mb-4 leading-relaxed text-sm md:text-base">
@@ -109,11 +120,7 @@ export default function TeacherView() {
                   <div className="bg-white px-4 py-3 rounded-xl border border-slate-200 text-slate-600 font-mono text-xs md:text-sm overflow-hidden text-ellipsis whitespace-nowrap shadow-sm max-w-[240px] md:max-w-md">
                     {studentUrl}
                   </div>
-                  <button
-                    onClick={handleCopyLink}
-                    className="flex-shrink-0 flex items-center justify-center w-12 h-[46px] bg-slate-800 text-white rounded-xl shadow-sm hover:bg-slate-700 active:scale-95 transition-all"
-                    title="リンクをコピー"
-                  >
+                  <button onClick={handleCopyLink} className="flex-shrink-0 flex items-center justify-center w-12 h-[46px] bg-slate-800 text-white rounded-xl shadow-sm hover:bg-slate-700 active:scale-95 transition-all">
                     {isCopied ? <Check size={20} className="text-green-400" /> : <Copy size={20} />}
                   </button>
                 </div>

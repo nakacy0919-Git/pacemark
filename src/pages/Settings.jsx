@@ -11,13 +11,11 @@ export default function Settings() {
   const [showProgressToAll, setShowProgressToAll] = useState(false);
   const [namesText, setNamesText] = useState('');
   
-  // ▼ 保存機能のためのステート ▼
   const [savedLists, setSavedLists] = useState([]);
   const [saveName, setSaveName] = useState('');
   
   const navigate = useNavigate();
 
-  // 画面を開いたときに、ブラウザに保存されている名簿データを読み込む
   useEffect(() => {
     const loaded = localStorage.getItem('pacemark_saved_lists');
     if (loaded) {
@@ -34,7 +32,6 @@ export default function Settings() {
     }
   };
 
-  // ▼ 名簿を保存する処理 ▼
   const handleSaveList = () => {
     if (!namesText.trim() || !saveName.trim()) {
       alert("名簿のデータと、保存するための名前（クラス名など）を入力してください。");
@@ -44,17 +41,15 @@ export default function Settings() {
     const updatedLists = [...savedLists, newList];
     setSavedLists(updatedLists);
     localStorage.setItem('pacemark_saved_lists', JSON.stringify(updatedLists));
-    setSaveName(''); // 入力欄をクリア
+    setSaveName('');
   };
 
-  // ▼ 保存した名簿を読み込む処理 ▼
   const handleLoadList = (list) => {
     setNamesText(list.data);
     const validLines = list.data.split('\n').filter(line => line.trim() !== '');
     setStudents(validLines.length > 0 ? validLines.length : 40);
   };
 
-  // ▼ 保存した名簿を削除する処理 ▼
   const handleDeleteList = (id) => {
     if(!window.confirm("この名簿データを削除してもよろしいですか？")) return;
     const updatedLists = savedLists.filter(list => list.id !== id);
@@ -78,10 +73,12 @@ export default function Settings() {
         questionsCount: questions,
         timerMinutes: timer,
         showProgressToAll: showProgressToAll,
-        startTime: Date.now(),
+        startTime: null, // ★ここを修正：作成時はタイマー未開始
       },
       progress: {},
-      names: namesObj
+      names: namesObj,
+      activeUsers: {}, // ログイン中の生徒
+      absentUsers: {}  // 欠席の生徒
     };
 
     try {
@@ -96,7 +93,6 @@ export default function Settings() {
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center py-8 px-4 font-sans">
       <div className="max-w-4xl w-full">
-        
         <div className="text-center mb-12">
           <div className="flex items-center justify-center gap-3 mb-3">
             <img src="/pacemarklogo.png" alt="PaceMark Logo" className="w-12 h-12 md:w-14 md:h-14 object-contain" />
@@ -112,16 +108,11 @@ export default function Settings() {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
           <div className="space-y-6 flex flex-col">
             <CounterButton label="生徒の人数（人）" value={students} onChange={setStudents} max={100} />
-            
             <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-100 flex-grow flex flex-col">
               <label className="block text-slate-600 font-bold mb-3 text-center">生徒の氏名（任意）</label>
-              
-              {/* ▼ 画像の指摘通り、左寄せにして1段落に収まるよう調整 ▼ */}
               <p className="text-[13px] text-slate-400 mb-4 text-left tracking-tight">
                 エクセル等から改行区切りで貼り付けると、上の人数も自動で連動します。
               </p>
-
-              {/* ▼ 名簿の保存・読込UI ▼ */}
               <div className="mb-4 p-3 bg-slate-50 rounded-xl border border-slate-200">
                 <div className="flex gap-2 mb-2">
                   <input 
@@ -138,7 +129,6 @@ export default function Settings() {
                     保存する
                   </button>
                 </div>
-                
                 {savedLists.length > 0 && (
                   <div className="flex flex-wrap gap-2 mt-3 pt-3 border-t border-slate-200">
                     {savedLists.map(list => (
@@ -153,7 +143,6 @@ export default function Settings() {
                         <button 
                           onClick={() => handleDeleteList(list.id)}
                           className="px-2 py-1.5 bg-slate-50 text-slate-300 hover:bg-red-100 hover:text-red-500 transition-colors border-l border-slate-100"
-                          title="削除"
                         >
                           ✕
                         </button>
@@ -162,7 +151,6 @@ export default function Settings() {
                   </div>
                 )}
               </div>
-
               <textarea
                 className="w-full flex-grow p-3 bg-slate-50 border-2 border-slate-200 rounded-xl font-mono text-sm focus:border-blue-400 focus:outline-none transition-colors resize-none"
                 value={namesText}
@@ -172,11 +160,9 @@ export default function Settings() {
               />
             </div>
           </div>
-
           <div className="space-y-6 flex flex-col">
             <CounterButton label="問題数（問）" value={questions} onChange={setQuestions} max={50} />
             <CounterButton label="制限時間（分）" value={timer} onChange={setTimer} max={120} />
-            
             <div className="flex items-center justify-between p-5 bg-white rounded-2xl shadow-sm border border-slate-100 mt-auto">
               <span className="text-slate-600 font-bold">全員に進捗を公開</span>
               <label className="relative inline-flex items-center cursor-pointer">
@@ -191,7 +177,6 @@ export default function Settings() {
             </div>
           </div>
         </div>
-
         <div className="flex justify-center max-w-md mx-auto">
           <button 
             onClick={handleStart}

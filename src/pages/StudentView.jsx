@@ -12,7 +12,6 @@ export default function StudentView() {
   const [sessionData, setSessionData] = useState(null);
   const [myId, setMyId] = useState('');
 
-  // 以前はバラバラに取得していましたが、全体の進捗を計算するためにセッション丸ごと取得に変更
   useEffect(() => {
     if (!sessionId) return;
     const sessionRef = ref(db, `sessions/${sessionId}`);
@@ -32,13 +31,29 @@ export default function StudentView() {
     await update(ref(db), updates);
   };
 
-  // SOSボタンの処理
   const handleToggleSos = async () => {
     if (!sessionId || !myId) return;
     const isSos = sessionData?.sos?.[myId] || false;
     const updates = {};
     updates[`sessions/${sessionId}/sos/${myId}`] = !isSos;
     await update(ref(db), updates);
+  };
+
+  // ★ 生徒が名前を選んだときの処理（ログイン状態をONにする）
+  const handleSelectName = async (numStr) => {
+    setMyId(numStr);
+    if (!sessionId) return;
+    await update(ref(db, `sessions/${sessionId}/activeUsers`), {
+      [numStr]: true
+    });
+  };
+
+  // ★ 名前を選び直すときの処理（ログイン状態を一旦解除する）
+  const handleChangeName = async () => {
+    if (sessionId && myId) {
+      await update(ref(db, `sessions/${sessionId}/activeUsers`), { [myId]: null });
+    }
+    setMyId('');
   };
 
   if (!sessionId) {
@@ -54,7 +69,7 @@ export default function StudentView() {
   
   if (!sessionData || !sessionData.settings) return <div className="p-8 text-center text-slate-500 font-bold">授業データを読み込み中...</div>;
 
-  const { settings, names = {}, progress = {}, sos = {} } = sessionData;
+  const { settings, names = {}, progress = {}, sos = {}, absentUsers = {} } = sessionData;
 
   if (!myId) {
     return (
@@ -63,11 +78,14 @@ export default function StudentView() {
           <h1 className="text-2xl font-extrabold text-slate-800 mb-6">自分の名前を選んでね</h1>
           <div className="grid grid-cols-2 md:grid-cols-3 gap-3 max-h-[60vh] overflow-y-auto p-2">
             {Array.from({ length: settings.studentsCount }, (_, i) => i + 1).map(num => {
+              // 欠席処理された生徒は選択画面からも消す
+              if (absentUsers[num]) return null;
+              
               const studentName = names[num] || `生徒 ${num}`;
               return (
                 <button
                   key={num}
-                  onClick={() => setMyId(num.toString())}
+                  onClick={() => handleSelectName(num.toString())}
                   className="py-3 px-2 rounded-xl bg-slate-50 text-slate-600 border border-slate-200 hover:bg-blue-50 hover:text-blue-600 hover:border-blue-200 active:scale-95 transition-all flex flex-col items-center justify-center gap-1"
                 >
                   <span className="text-xs font-bold text-slate-400">{num}番</span>
@@ -85,22 +103,25 @@ export default function StudentView() {
   const myProgress = progress[myId] || {};
   const isMySos = sos[myId] || false;
 
-  // クラス全体の進捗率を計算（生徒用）
-  const totalQuestions = settings.studentsCount * settings.questionsCount;
+  // 全体の進捗計算（欠席者を除外）
   let completedQuestions = 0;
+  let activeStudentCount = 0;
   for (let i = 1; i <= settings.studentsCount; i++) {
-    const p = progress[i] || {};
-    for (let j = 1; j <= settings.questionsCount; j++) {
-      if (p[j]) completedQuestions++;
+    if (!absentUsers[i]) {
+      activeStudentCount++;
+      const p = progress[i] || {};
+      for (let j = 1; j <= settings.questionsCount; j++) {
+        if (p[j]) completedQuestions++;
+      }
     }
   }
+  const totalQuestions = activeStudentCount * settings.questionsCount;
   const classProgressPercent = totalQuestions > 0 ? Math.round((completedQuestions / totalQuestions) * 100) : 0;
 
   return (
     <div className="min-h-screen bg-slate-50 p-4 md:p-8 font-sans flex flex-col items-center">
       <div className="max-w-2xl w-full">
         
-        {/* ★ 設定でONの場合のみ、生徒画面にもプログレスバーを表示 */}
         {settings.showProgressToAll && (
           <div className="bg-white rounded-3xl p-5 border border-slate-100 shadow-sm mb-6">
             <div className="flex justify-between items-end mb-2">
@@ -125,7 +146,7 @@ export default function StudentView() {
               <h1 className="text-xl font-extrabold text-slate-800">{myName}</h1>
               <div className="flex items-center gap-4 mt-2">
                 <button 
-                  onClick={() => setMyId('')}
+                  onClick={handleChangeName}
                   className="text-sm text-slate-400 hover:text-slate-600 font-bold underline whitespace-nowrap"
                 >
                   名前を変える
@@ -134,7 +155,6 @@ export default function StudentView() {
             </div>
             
             <div className="flex items-center gap-4 w-full md:w-auto justify-between md:justify-end">
-              {/* ★ SOSボタン */}
               <button
                 onClick={handleToggleSos}
                 className={`flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold transition-all shadow-sm ${
@@ -147,8 +167,13 @@ export default function StudentView() {
                 {isMySos ? '先生を呼んでいます...' : '先生、教えて！'}
               </button>
 
-              {settings.startTime && (
+              {/* ★ 先生がスタートするまでは「待機中」を表示 */}
+              {settings.startTime ? (
                 <CountdownTimer startTime={settings.startTime} timerMinutes={settings.timerMinutes} />
+              ) : (
+                <div className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-slate-100 text-slate-500 font-bold font-mono">
+                  待機中...
+                </div>
               )}
             </div>
           </div>
