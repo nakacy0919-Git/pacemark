@@ -3,7 +3,6 @@ import { useNavigate } from 'react-router-dom';
 import CounterButton from '../components/CounterButton';
 import { db } from '../lib/firebase';
 import { ref, set } from 'firebase/database';
-import { Sparkles } from 'lucide-react'; // ★キラキラアイコンを追加
 
 export default function Settings() {
   const [students, setStudents] = useState(40);
@@ -59,10 +58,11 @@ export default function Settings() {
     <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center py-8 px-4 font-sans">
       <div className="max-w-4xl w-full">
         
-        {/* ★ここからタイトルのデザインを変更 */}
+        {/* ▼ タイトルのデザイン（ロゴ画像への差し替え） ▼ */}
         <div className="text-center mb-12">
           <div className="flex items-center justify-center gap-3 mb-3">
-            <Sparkles className="text-blue-500" size={40} strokeWidth={2} />
+            {/* imgタグを使ってオリジナルのロゴを表示します */}
+            <img src="/pacemarklogo.png" alt="PaceMark Logo" className="w-12 h-12 md:w-14 md:h-14 object-contain" />
             <h1 className="text-6xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-blue-600 via-blue-500 to-cyan-400 tracking-tighter pb-1">
               PaceMark
             </h1>
@@ -71,7 +71,6 @@ export default function Settings() {
             クラスの進捗をリアルタイムに
           </p>
         </div>
-        {/* ★ここまで */}
         
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
           <div className="space-y-6 flex flex-col">
