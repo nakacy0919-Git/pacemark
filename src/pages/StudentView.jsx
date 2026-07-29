@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useSearchParams, Link } from 'react-router-dom';
 import { db } from '../lib/firebase';
 import { ref, onValue, update } from 'firebase/database';
-import { Check, Flame, AlertCircle } from 'lucide-react';
+import { Check, Flame, AlertCircle, Award } from 'lucide-react'; // アイコン追加
 import CountdownTimer from '../components/CountdownTimer';
 
 export default function StudentView() {
@@ -11,6 +11,9 @@ export default function StudentView() {
   
   const [sessionData, setSessionData] = useState(null);
   const [myId, setMyId] = useState('');
+  
+  // タイマーが0になったかを管理
+  const [isTimeUp, setIsTimeUp] = useState(false);
 
   useEffect(() => {
     if (!sessionId) return;
@@ -20,6 +23,23 @@ export default function StudentView() {
     });
     return () => unsubscribe();
   }, [sessionId]);
+
+  // ★ 時間の監視
+  useEffect(() => {
+    if (!sessionData?.settings?.startTime) {
+      setIsTimeUp(false);
+      return;
+    }
+    const endTime = sessionData.settings.startTime + sessionData.settings.timerMinutes * 60 * 1000;
+    const checkTime = () => {
+      if (Date.now() >= endTime) {
+        setIsTimeUp(true);
+      }
+    };
+    checkTime();
+    const interval = setInterval(checkTime, 1000);
+    return () => clearInterval(interval);
+  }, [sessionData?.settings?.startTime, sessionData?.settings?.timerMinutes]);
 
   const handleToggleQuestion = async (qId) => {
     if (!sessionId || !myId) return;
@@ -60,9 +80,11 @@ export default function StudentView() {
 
   const { settings, names = {}, progress = {}, sos = {}, absentUsers = {} } = sessionData;
 
-  // ★ 独自形式の問題リストを取得（古いデータの場合は互換用リストを生成）
   const finalQuestionsList = settings.questionsList || 
     Array.from({ length: settings.questionsCount }, (_, i) => ({ id: (i + 1).toString(), label: `問 ${i + 1}` }));
+
+  // ★ 授業終了フラグ（先生の手動終了 or 時間切れ）
+  const isLessonEnded = settings.isEnded || isTimeUp;
 
   if (!myId) {
     return (
@@ -102,6 +124,29 @@ export default function StudentView() {
   const totalQuestions = activeStudentCount * finalQuestionsList.length;
   const classProgressPercent = totalQuestions > 0 ? Math.round((completedQuestions / totalQuestions) * 100) : 0;
 
+  // ★ 授業終了時、操作をロックしてアナウンス画面を表示
+  if (isLessonEnded) {
+    return (
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4 font-sans">
+        <div className="bg-white p-10 rounded-3xl shadow-xl border border-slate-100 text-center max-w-md w-full animate-fade-in">
+          <div className="w-24 h-24 bg-blue-100 text-blue-500 rounded-full flex items-center justify-center mx-auto mb-6 shadow-inner">
+            <Award size={48} strokeWidth={2.5} />
+          </div>
+          <h1 className="text-4xl font-extrabold text-slate-800 mb-4 tracking-tight">終了！</h1>
+          <p className="text-slate-500 font-bold mb-8">お疲れ様でした。<br/>顔を上げて先生の指示を聞きましょう。</p>
+          
+          <div className="bg-slate-50 p-6 rounded-2xl border border-slate-100">
+            <p className="text-sm text-slate-400 font-bold mb-2">クラス全体のミッション達成率</p>
+            <div className="text-5xl font-extrabold text-blue-500">
+              {classProgressPercent}<span className="text-3xl">%</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // 以下、通常の授業中画面
   return (
     <div className="min-h-screen bg-slate-50 p-4 md:p-8 font-sans flex flex-col items-center">
       <div className="max-w-3xl w-full">

@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useSearchParams, Link } from 'react-router-dom';
 import { QRCodeSVG } from 'qrcode.react';
-import { Copy, Check, Maximize2, X, Play } from 'lucide-react';
+import { Copy, Check, Maximize2, X, Play, SquareSquare } from 'lucide-react';
 import { db } from '../lib/firebase';
 import { ref, onValue, update } from 'firebase/database';
 import ProgressGrid from '../components/ProgressGrid';
@@ -15,6 +15,9 @@ export default function TeacherView() {
   const [isQRModalOpen, setIsQRModalOpen] = useState(false);
   const [isCopied, setIsCopied] = useState(false);
   const [settings, setSettings] = useState(null);
+  
+  // タイマーが0になったかを管理するステート
+  const [isTimeUp, setIsTimeUp] = useState(false);
 
   useEffect(() => {
     if (!sessionId) return;
@@ -27,17 +30,42 @@ export default function TeacherView() {
     return () => unsubscribe();
   }, [sessionId]);
 
+  // ★ タイマーの時間を常に監視し、0になったら isTimeUp を true にする
+  useEffect(() => {
+    if (!settings?.startTime) {
+      setIsTimeUp(false);
+      return;
+    }
+    const endTime = settings.startTime + settings.timerMinutes * 60 * 1000;
+    const checkTime = () => {
+      if (Date.now() >= endTime) {
+        setIsTimeUp(true);
+      }
+    };
+    checkTime();
+    const interval = setInterval(checkTime, 1000);
+    return () => clearInterval(interval);
+  }, [settings?.startTime, settings?.timerMinutes]);
+
   const handleCopyLink = () => {
     navigator.clipboard.writeText(studentUrl);
     setIsCopied(true);
     setTimeout(() => setIsCopied(false), 2000);
   };
 
-  // ★ タイマーを手動でスタートする処理
   const handleStartTimer = async () => {
     if (!sessionId) return;
     await update(ref(db, `sessions/${sessionId}/settings`), {
       startTime: Date.now()
+    });
+  };
+
+  // ★ 手動で授業を終了する処理
+  const handleEndSession = async () => {
+    if (!window.confirm("授業を終了しますか？\n生徒の画面がロックされ、結果発表画面に切り替わります。")) return;
+    if (!sessionId) return;
+    await update(ref(db, `sessions/${sessionId}/settings`), {
+      isEnded: true
     });
   };
 
@@ -52,21 +80,19 @@ export default function TeacherView() {
     );
   }
 
+  // ★ 「手動終了」または「タイマー切れ」のどちらかで終了状態と判定
+  const isLessonEnded = settings?.isEnded || isTimeUp;
+
   return (
     <>
       {isQRModalOpen && (
         <div className="fixed inset-0 z-50 bg-slate-900/80 backdrop-blur-sm flex flex-col items-center justify-center p-4 transition-all">
-          <button
-            onClick={() => setIsQRModalOpen(false)}
-            className="absolute top-6 right-6 md:top-10 md:right-10 text-white hover:text-slate-300 transition-colors"
-          >
+          <button onClick={() => setIsQRModalOpen(false)} className="absolute top-6 right-6 md:top-10 md:right-10 text-white hover:text-slate-300 transition-colors">
             <X size={48} strokeWidth={2} />
           </button>
           <div className="bg-white p-6 md:p-12 rounded-3xl shadow-2xl flex flex-col items-center gap-6">
             <QRCodeSVG value={studentUrl} size={400} level="H" className="w-[70vw] max-w-[400px] h-auto" />
-            <p className="text-slate-800 text-3xl font-extrabold tracking-widest font-mono">
-              ID: {sessionId}
-            </p>
+            <p className="text-slate-800 text-3xl font-extrabold tracking-widest font-mono">ID: {sessionId}</p>
           </div>
         </div>
       )}
@@ -80,22 +106,27 @@ export default function TeacherView() {
                 <p className="text-slate-500 mt-2 font-medium">セッションID: <span className="text-blue-500 font-bold">{sessionId}</span></p>
               </div>
               
-              <div className="flex items-center gap-6">
-                {/* ★ startTimeがあるかどうかで、タイマーかスタートボタンかを切り替え */}
-                {settings && settings.startTime ? (
-                  <CountdownTimer startTime={settings.startTime} timerMinutes={settings.timerMinutes} />
-                ) : (
-                  <button 
-                    onClick={handleStartTimer}
-                    className="flex items-center gap-2 px-5 py-2.5 bg-slate-800 text-white font-bold rounded-2xl shadow-sm hover:bg-slate-700 active:scale-95 transition-all"
-                  >
-                    <Play size={20} className="fill-white" />
-                    タイマーを開始
+              <div className="flex items-center gap-4">
+                {/* 状態によって右上のボタン表示を切り替え */}
+                {!settings?.startTime ? (
+                  <button onClick={handleStartTimer} className="flex items-center gap-2 px-5 py-2.5 bg-slate-800 text-white font-bold rounded-2xl shadow-sm hover:bg-slate-700 active:scale-95 transition-all">
+                    <Play size={20} className="fill-white" /> タイマーを開始
                   </button>
+                ) : isLessonEnded ? (
+                  <div className="px-5 py-2.5 bg-slate-200 text-slate-500 font-bold rounded-2xl flex items-center gap-2">
+                    授業終了
+                  </div>
+                ) : (
+                  <>
+                    <CountdownTimer startTime={settings.startTime} timerMinutes={settings.timerMinutes} />
+                    <button onClick={handleEndSession} className="px-5 py-2.5 bg-red-500 text-white font-bold rounded-2xl shadow-sm hover:bg-red-400 active:scale-95 transition-all">
+                      授業を終了
+                    </button>
+                  </>
                 )}
                 
-                <Link to="/" className="px-5 py-2 bg-slate-100 text-slate-600 font-bold rounded-xl hover:bg-slate-200 transition-all">
-                  終了して戻る
+                <Link to="/" className="px-5 py-2.5 bg-slate-100 text-slate-600 font-bold rounded-xl hover:bg-slate-200 transition-all ml-2" title="トップ画面（設定）に戻ります">
+                  トップ(新規作成)
                 </Link>
               </div>
             </div>
