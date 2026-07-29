@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import CounterButton from '../components/CounterButton';
 import { db } from '../lib/firebase';
 import { ref, set } from 'firebase/database';
-import { Trash2, Plus } from 'lucide-react'; // アイコンを追加
+import { Trash2, Plus, Settings2 } from 'lucide-react';
 
 export default function Settings() {
   const [students, setStudents] = useState(40);
@@ -14,7 +14,12 @@ export default function Settings() {
   const [savedLists, setSavedLists] = useState([]);
   const [saveName, setSaveName] = useState('');
 
-  // ★ 追加：問題グループを管理するステート
+  // ★ 追加：シンプルモード/カスタムモードの切り替え
+  const [isCustomMode, setIsCustomMode] = useState(false);
+  // ★ シンプルモード用の問題数ステート（復活）
+  const [questions, setQuestions] = useState(10);
+  
+  // カスタムモード用の問題グループステート
   const [questionGroups, setQuestionGroups] = useState([
     { id: 'g1', mainLabel: '問1', subs: [] },
     { id: 'g2', mainLabel: '問2', subs: [] }
@@ -59,7 +64,7 @@ export default function Settings() {
     localStorage.setItem('pacemark_saved_lists', JSON.stringify(updatedLists));
   };
 
-  // ▼ 問題エディタの処理 ▼
+  // ▼ カスタムエディタの処理 ▼
   const handleAddGroup = () => {
     setQuestionGroups([...questionGroups, { id: `g${Date.now()}`, mainLabel: `問${questionGroups.length + 1}`, subs: [] }]);
   };
@@ -102,14 +107,25 @@ export default function Settings() {
     }));
   };
 
-  // 生成される最終的な問題リストを作成
-  const questionsList = questionGroups.flatMap(g => {
+  // カスタム編集モードでの最終的な問題リストを作成
+  const customQuestionsList = questionGroups.flatMap(g => {
     if (g.subs.length === 0) return [{ id: g.id, label: g.mainLabel }];
     return g.subs.filter(s => s.trim() !== '').map((sub, i) => ({ id: `${g.id}-${i}`, label: `${g.mainLabel} - ${sub}` }));
   });
 
   const handleStart = async () => {
-    if (questionsList.length === 0) {
+    // ★ 選択されているモードに応じて問題リストを確定する
+    let finalQuestionsList = [];
+    if (isCustomMode) {
+      finalQuestionsList = customQuestionsList;
+    } else {
+      finalQuestionsList = Array.from({ length: questions }, (_, i) => ({
+        id: (i + 1).toString(),
+        label: `問 ${i + 1}`
+      }));
+    }
+
+    if (finalQuestionsList.length === 0) {
       alert("問題が設定されていません。");
       return;
     }
@@ -124,8 +140,8 @@ export default function Settings() {
     const initialData = {
       settings: {
         studentsCount: students,
-        questionsCount: questionsList.length,
-        questionsList: questionsList, // ★ 作成した問題リストを保存
+        questionsCount: finalQuestionsList.length,
+        questionsList: finalQuestionsList,
         timerMinutes: timer,
         showProgressToAll: showProgressToAll,
         startTime: null,
@@ -193,71 +209,92 @@ export default function Settings() {
           </div>
 
           {/* 右カラム：授業・問題設定 */}
-          <div className="space-y-6 flex flex-col">
+          <div className="space-y-6 flex flex-col relative">
             
-            {/* ★ 新しい問題ブロックエディタ */}
-            <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-100 flex-grow flex flex-col max-h-[500px]">
-              <div className="flex justify-between items-center mb-4">
-                <label className="text-slate-600 font-bold">問題の構成</label>
-                <span className="bg-blue-100 text-blue-700 px-3 py-1 rounded-full text-sm font-bold">
-                  合計: {questionsList.length} 問
-                </span>
-              </div>
-              
-              <div className="flex-grow overflow-y-auto pr-2 space-y-4 mb-4">
-                {questionGroups.map((group, index) => (
-                  <div key={group.id} className="bg-slate-50 border border-slate-200 rounded-xl p-4 relative group">
-                    <button onClick={() => handleRemoveGroup(group.id)} className="absolute top-3 right-3 text-slate-300 hover:text-red-500 transition-colors">
-                      <Trash2 size={18} />
-                    </button>
-                    
-                    <div className="mb-3 pr-8">
-                      <input 
-                        type="text" 
-                        value={group.mainLabel} 
-                        onChange={(e) => handleUpdateMainLabel(group.id, e.target.value)}
-                        className="w-full font-bold text-slate-700 bg-white border border-slate-200 rounded-lg p-2 focus:outline-none focus:border-blue-400"
-                        placeholder="例: 大問1、Task 1"
-                      />
-                    </div>
-
-                    <div className="bg-white rounded-lg p-3 border border-slate-100">
-                      <div className="flex flex-wrap gap-2 mb-3">
-                        <span className="text-xs text-slate-400 font-bold self-center mr-1">小問の追加:</span>
-                        <button onClick={() => handleAddSubsPreset(group.id, 'abc')} className="text-xs bg-slate-100 hover:bg-slate-200 text-slate-600 px-2 py-1 rounded transition-colors">A, B, C...</button>
-                        <button onClick={() => handleAddSubsPreset(group.id, '123')} className="text-xs bg-slate-100 hover:bg-slate-200 text-slate-600 px-2 py-1 rounded transition-colors">(1), (2), (3)...</button>
-                        <button onClick={() => handleAddSubsPreset(group.id, 'custom')} className="text-xs bg-blue-50 hover:bg-blue-100 text-blue-600 px-2 py-1 rounded transition-colors border border-blue-100 flex items-center gap-1"><Plus size={12}/> 自由に追加</button>
+            {/* ★ 切り替えボタン（右上） */}
+            <div className="absolute right-0 -top-12 md:-top-4 z-10">
+              <button 
+                onClick={() => setIsCustomMode(!isCustomMode)}
+                className={`flex items-center gap-1.5 px-4 py-2 text-sm font-bold rounded-xl shadow-sm transition-colors ${
+                  isCustomMode 
+                    ? 'bg-slate-200 text-slate-600 hover:bg-slate-300' 
+                    : 'bg-blue-100 text-blue-700 hover:bg-blue-200'
+                }`}
+              >
+                <Settings2 size={16} />
+                {isCustomMode ? 'シンプル設定に戻す' : 'カスタム編集'}
+              </button>
+            </div>
+            
+            {/* モードによって表示を切り替え */}
+            {!isCustomMode ? (
+               <div className="pt-8 md:pt-0">
+                 <CounterButton label="問題数（問）" value={questions} onChange={setQuestions} max={100} />
+               </div>
+            ) : (
+              <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-100 flex-grow flex flex-col max-h-[500px]">
+                <div className="flex justify-between items-center mb-4">
+                  <label className="text-slate-600 font-bold">問題の構成</label>
+                  <span className="bg-blue-100 text-blue-700 px-3 py-1 rounded-full text-sm font-bold">
+                    合計: {customQuestionsList.length} 問
+                  </span>
+                </div>
+                
+                <div className="flex-grow overflow-y-auto pr-2 space-y-4 mb-4">
+                  {questionGroups.map((group, index) => (
+                    <div key={group.id} className="bg-slate-50 border border-slate-200 rounded-xl p-4 relative group">
+                      <button onClick={() => handleRemoveGroup(group.id)} className="absolute top-3 right-3 text-slate-300 hover:text-red-500 transition-colors">
+                        <Trash2 size={18} />
+                      </button>
+                      
+                      <div className="mb-3 pr-8">
+                        <input 
+                          type="text" 
+                          value={group.mainLabel} 
+                          onChange={(e) => handleUpdateMainLabel(group.id, e.target.value)}
+                          className="w-full font-bold text-slate-700 bg-white border border-slate-200 rounded-lg p-2 focus:outline-none focus:border-blue-400"
+                          placeholder="例: 大問1、Task 1"
+                        />
                       </div>
 
-                      {group.subs.length > 0 && (
-                        <div className="space-y-2">
-                          {group.subs.map((sub, sIdx) => (
-                            <div key={sIdx} className="flex items-center gap-2">
-                              <span className="text-slate-400 text-sm">↳</span>
-                              <input 
-                                type="text" value={sub} onChange={(e) => handleUpdateSub(group.id, sIdx, e.target.value)}
-                                className="flex-grow text-sm bg-slate-50 border border-slate-200 rounded p-1.5 focus:outline-none focus:border-blue-400"
-                                placeholder="例: (1) や A"
-                              />
-                              <button onClick={() => handleRemoveSub(group.id, sIdx)} className="text-slate-300 hover:text-red-500">
-                                <Trash2 size={16} />
-                              </button>
-                            </div>
-                          ))}
+                      <div className="bg-white rounded-lg p-3 border border-slate-100">
+                        <div className="flex flex-wrap gap-2 mb-3">
+                          <span className="text-xs text-slate-400 font-bold self-center mr-1">小問の追加:</span>
+                          <button onClick={() => handleAddSubsPreset(group.id, 'abc')} className="text-xs bg-slate-100 hover:bg-slate-200 text-slate-600 px-2 py-1 rounded transition-colors">A, B, C...</button>
+                          <button onClick={() => handleAddSubsPreset(group.id, '123')} className="text-xs bg-slate-100 hover:bg-slate-200 text-slate-600 px-2 py-1 rounded transition-colors">(1), (2), (3)...</button>
+                          <button onClick={() => handleAddSubsPreset(group.id, 'custom')} className="text-xs bg-blue-50 hover:bg-blue-100 text-blue-600 px-2 py-1 rounded transition-colors border border-blue-100 flex items-center gap-1"><Plus size={12}/> 自由に追加</button>
                         </div>
-                      )}
-                      {group.subs.length === 0 && (
-                        <p className="text-xs text-slate-400">小問がない場合は「{group.mainLabel}」として1問になります。</p>
-                      )}
+
+                        {group.subs.length > 0 && (
+                          <div className="space-y-2">
+                            {group.subs.map((sub, sIdx) => (
+                              <div key={sIdx} className="flex items-center gap-2">
+                                <span className="text-slate-400 text-sm">↳</span>
+                                <input 
+                                  type="text" value={sub} onChange={(e) => handleUpdateSub(group.id, sIdx, e.target.value)}
+                                  className="flex-grow text-sm bg-slate-50 border border-slate-200 rounded p-1.5 focus:outline-none focus:border-blue-400"
+                                  placeholder="例: (1) や A"
+                                />
+                                <button onClick={() => handleRemoveSub(group.id, sIdx)} className="text-slate-300 hover:text-red-500">
+                                  <Trash2 size={16} />
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                        {group.subs.length === 0 && (
+                          <p className="text-xs text-slate-400">小問がない場合は「{group.mainLabel}」として1問になります。</p>
+                        )}
+                      </div>
                     </div>
-                  </div>
-                ))}
-                
-                <button onClick={handleAddGroup} className="w-full py-3 border-2 border-dashed border-slate-300 rounded-xl text-slate-500 font-bold hover:bg-slate-50 hover:border-blue-400 hover:text-blue-500 transition-colors flex items-center justify-center gap-2">
-                  <Plus size={20} /> グループ（大問など）を追加
-                </button>
+                  ))}
+                  
+                  <button onClick={handleAddGroup} className="w-full py-3 border-2 border-dashed border-slate-300 rounded-xl text-slate-500 font-bold hover:bg-slate-50 hover:border-blue-400 hover:text-blue-500 transition-colors flex items-center justify-center gap-2">
+                    <Plus size={20} /> グループ（大問など）を追加
+                  </button>
+                </div>
               </div>
-            </div>
+            )}
 
             <CounterButton label="制限時間（分）" value={timer} onChange={setTimer} max={120} />
             
