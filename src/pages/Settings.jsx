@@ -14,12 +14,9 @@ export default function Settings() {
   const [savedLists, setSavedLists] = useState([]);
   const [saveName, setSaveName] = useState('');
 
-  // ★ 追加：シンプルモード/カスタムモードの切り替え
   const [isCustomMode, setIsCustomMode] = useState(false);
-  // ★ シンプルモード用の問題数ステート（復活）
   const [questions, setQuestions] = useState(10);
   
-  // カスタムモード用の問題グループステート
   const [questionGroups, setQuestionGroups] = useState([
     { id: 'g1', mainLabel: '問1', subs: [] },
     { id: 'g2', mainLabel: '問2', subs: [] }
@@ -64,7 +61,6 @@ export default function Settings() {
     localStorage.setItem('pacemark_saved_lists', JSON.stringify(updatedLists));
   };
 
-  // ▼ カスタムエディタの処理 ▼
   const handleAddGroup = () => {
     setQuestionGroups([...questionGroups, { id: `g${Date.now()}`, mainLabel: `問${questionGroups.length + 1}`, subs: [] }]);
   };
@@ -107,14 +103,12 @@ export default function Settings() {
     }));
   };
 
-  // カスタム編集モードでの最終的な問題リストを作成
   const customQuestionsList = questionGroups.flatMap(g => {
     if (g.subs.length === 0) return [{ id: g.id, label: g.mainLabel }];
     return g.subs.filter(s => s.trim() !== '').map((sub, i) => ({ id: `${g.id}-${i}`, label: `${g.mainLabel} - ${sub}` }));
   });
 
   const handleStart = async () => {
-    // ★ 選択されているモードに応じて問題リストを確定する
     let finalQuestionsList = [];
     if (isCustomMode) {
       finalQuestionsList = customQuestionsList;
@@ -164,20 +158,21 @@ export default function Settings() {
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center py-8 px-4 font-sans">
       <div className="max-w-5xl w-full">
-        <div className="text-center mb-10">
-          <div className="flex items-center justify-center gap-3 mb-3">
-            <img src="/pacemarklogo.png" alt="PaceMark Logo" className="w-12 h-12 md:w-14 md:h-14 object-contain" />
-            <h1 className="text-6xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-blue-600 via-blue-500 to-cyan-400 tracking-tighter pb-1">
+        
+        {/* ▼ ロゴとタイトルのサイズを大幅に大きく調整しました ▼ */}
+        <div className="text-center mb-14">
+          <div className="flex items-center justify-center gap-4 md:gap-6 mb-4">
+            <img src="/pacemarklogo.png" alt="PaceMark Logo" className="w-20 h-20 md:w-28 md:h-28 object-contain" />
+            <h1 className="text-7xl md:text-[6rem] leading-none font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-blue-600 via-blue-500 to-cyan-400 tracking-tighter pb-1 md:pb-2">
               PaceMark
             </h1>
           </div>
-          <p className="text-slate-500 font-bold tracking-widest text-sm">
+          <p className="text-slate-500 font-bold tracking-widest text-sm md:text-base mt-2">
             クラスの進捗をリアルタイムに
           </p>
         </div>
         
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
-          {/* 左カラム：生徒設定 */}
           <div className="space-y-6 flex flex-col">
             <CounterButton label="生徒の人数（人）" value={students} onChange={setStudents} max={100} />
             <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-100 flex-grow flex flex-col">
@@ -208,10 +203,7 @@ export default function Settings() {
             </div>
           </div>
 
-          {/* 右カラム：授業・問題設定 */}
           <div className="space-y-6 flex flex-col relative">
-            
-            {/* ★ 切り替えボタン（右上） */}
             <div className="absolute right-0 -top-12 md:-top-4 z-10">
               <button 
                 onClick={() => setIsCustomMode(!isCustomMode)}
@@ -226,7 +218,6 @@ export default function Settings() {
               </button>
             </div>
             
-            {/* モードによって表示を切り替え */}
             {!isCustomMode ? (
                <div className="pt-8 md:pt-0">
                  <CounterButton label="問題数（問）" value={questions} onChange={setQuestions} max={100} />
