@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import CounterButton from '../components/CounterButton';
 import { db } from '../lib/firebase';
 import { ref, set } from 'firebase/database';
-import { Trash2, Plus, Settings2 } from 'lucide-react';
+import { Trash2, Plus, Settings2, ArrowLeft } from 'lucide-react'; // ★ ArrowLeftを追加
 
 export default function Settings() {
   const [students, setStudents] = useState(40);
@@ -139,7 +139,7 @@ export default function Settings() {
         timerMinutes: timer,
         showProgressToAll: showProgressToAll,
         startTime: null,
-        isEnded: false, // ★ 追加：初期状態は終了していない
+        isEnded: false,
       },
       progress: {},
       names: namesObj,
@@ -157,10 +157,19 @@ export default function Settings() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center py-8 px-4 font-sans">
-      <div className="max-w-5xl w-full">
+    <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center py-8 px-4 font-sans relative">
+      
+      {/* ★ TimePaletteへ戻るリンクボタンを追加 ★ */}
+      <a 
+        href="https://timepalette.pic-speak-story.com/"
+        className="absolute top-4 left-4 md:top-6 md:left-6 flex items-center gap-1.5 px-3 py-2 bg-white text-slate-500 text-xs md:text-sm font-bold rounded-xl shadow-sm border border-slate-200 hover:bg-slate-50 hover:text-slate-700 transition-all active:scale-95"
+      >
+        <ArrowLeft size={16} />
+        TimePaletteに戻る
+      </a>
+
+      <div className="max-w-5xl w-full pt-6 md:pt-0">
         
-        {/* ▼ ロゴとタイトルのサイズを大幅に大きく調整しました ▼ */}
         <div className="text-center mb-14">
           <div className="flex items-center justify-center gap-4 md:gap-6 mb-4">
             <img src="/pacemarklogo.png" alt="PaceMark Logo" className="w-20 h-20 md:w-28 md:h-28 object-contain" />
@@ -175,7 +184,6 @@ export default function Settings() {
         
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
           
-          {/* 左カラム：生徒設定 */}
           <div className="space-y-6 flex flex-col">
             <CounterButton label="生徒の人数（人）" value={students} onChange={setStudents} max={100} />
             <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-100 flex-grow flex flex-col">
@@ -184,7 +192,6 @@ export default function Settings() {
                 エクセル等から改行区切りで貼り付けると、上の人数も自動で連動します。
               </p>
               
-              {/* 名簿の保存・読込UI */}
               <div className="mb-4 p-3 bg-slate-50 rounded-xl border border-slate-200">
                 <div className="flex gap-2 mb-2">
                   <input 
@@ -233,7 +240,6 @@ export default function Settings() {
             </div>
           </div>
 
-          {/* 右カラム：授業・問題設定 */}
           <div className="space-y-6 flex flex-col relative">
             <div className="absolute right-0 -top-12 md:-top-4 z-10">
               <button 
